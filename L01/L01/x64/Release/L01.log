@@ -1,0 +1,8 @@
+﻿  L01.cpp
+C:\Users\Tello\source\repos\antonydp\CG2023\L01\L01\L01.cpp(356,61): warning C4267: 'argomento': conversione da 'size_t' a 'GLsizei'. Possibile perdita di dati.
+  ShaderMaker.cpp
+  Generazione codice in corso...
+  Previous IPDB not found, fall back to full compilation.
+  All 173 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Generazione codice terminata
+  L01.vcxproj -> C:\Users\Tello\source\repos\antonydp\CG2023\L01\x64\Release\L01.exe

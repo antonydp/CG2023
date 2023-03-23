@@ -1,0 +1,2 @@
+C:/Users/Tello/source/repos/antonydp/CG2023/L01/packages/glm.0.9.9.800/build/native/include/glm/out/build/x64-Debug/CMakeFiles/edit_cache.dir
+C:/Users/Tello/source/repos/antonydp/CG2023/L01/packages/glm.0.9.9.800/build/native/include/glm/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
