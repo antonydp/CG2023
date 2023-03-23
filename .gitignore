@@ -2,7 +2,5 @@
 # Il file gitignore è stato creato automaticamente da Microsoft(R) Visual Studio.
 ################################################################################
 
-/.vs
-/L01/.vs/L01/v16
-/L01/L01/x64/Debug
-/L01/x64/Debug
+**/.vs
+**/Debug
