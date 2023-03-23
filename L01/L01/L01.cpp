@@ -330,7 +330,7 @@ void catmullRom(float Array[MaxNumPts][2], int NumPts) {
 	//Case P[0] (spline with that interpolates points 0 & 1)
 	vec2 P0(Array[0][0], Array[0][1]);
 	vec2 P1(Array[1][0], Array[1][1]);
-	vec2 P0p = P0 + P1 / 3.0f;
+	vec2 P0p = P0 + (P1 - P0) / 3.0f;
 	vec2 P2(Array[2][0], Array[2][1]);
 	vec2 P1m = P1 - (P2 - P0) / 6.0f;
 
