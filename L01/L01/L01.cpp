@@ -64,9 +64,14 @@ int selectedPoint = -1;
 float tol_planarita = 0.01f;
 
 //various modalities
-enum Behavior { DefaultMode, CatmullRom, Adattivo, Continuity};
+enum Behavior { DefaultMode, CatmullRom, Adattivo, Continuity };
 
 Behavior behavior = DefaultMode;
+
+//Continuity Behavior
+enum ContinuityBehavior { C0, C1, G1 };
+
+ContinuityBehavior continuityType = C0;
 
 //resolution (number of segments)
 int resolution;
@@ -87,17 +92,35 @@ void myKeyboardFunc(unsigned char key, int x, int y)
 		break;
 	case 'n':
 		behavior = DefaultMode;
+		glutPostRedisplay();
 		break;
-	case 't':
+	case 'i':
 		behavior = CatmullRom;
+		glutPostRedisplay();
 		break;
 	case 'a':
 		behavior = Adattivo;
+		glutPostRedisplay();
+		break;
+	case 'c':
+		behavior = Continuity;
+		glutPostRedisplay();
+		break;
+	case '0':
+		continuityType = C0;
+		glutPostRedisplay();
+		break;
+	case '1':
+		continuityType = C1;
+		glutPostRedisplay();
 		break;
 	case 'g':
-		behavior = Continuity;
+		continuityType = G1;
+		glutPostRedisplay();
 		break;
 	}
+
+
 }
 void removeFirstPoint() {
 	int i;
@@ -134,7 +157,6 @@ void NearestPoint(glm::vec2 point) {
 	selectedPoint = nearestIndex;
 }
 
-
 // Left button presses place a new control point.
 void myMouseFunc(int button, int state, int x, int y) {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
@@ -160,8 +182,8 @@ void motion(int x, int y) {
 	float yPos = -1.0f + ((float)(height - y)) * 2 / ((float)(height));
 
 	if (selectedPoint != -1) {
-		PointArray[selectedPoint][0] = xPos; 
-		PointArray[selectedPoint][1] = yPos; 
+		PointArray[selectedPoint][0] = xPos;
+		PointArray[selectedPoint][1] = yPos;
 		glutPostRedisplay();
 
 	}
@@ -184,6 +206,7 @@ void addNewPoint(float x, float y) {
 	PointArray[NumPts][1] = y;
 	NumPts++;
 }
+
 void initShader(void)
 {
 	GLenum ErrorCheckValue = glGetError();
@@ -196,28 +219,19 @@ void initShader(void)
 
 }
 
-// deCasteljau. t has to be less than resolution, greater than 0.
-glm::vec2 deCasteljau(float tempArray[MaxNumPts][2], int t, int resolution) { 
+// DeCasteljau algoritm.
+glm::vec2 deCasteljau(float tempArray[MaxNumPts][2], float t) {
 	for (int i = 0; i < NumPts - 1; i++) {
 		for (int j = 0; j < NumPts - i - 1; j++) {
-			tempArray[j][0] = (float)(resolution - t) / resolution * tempArray[j][0] + (float)t / resolution * tempArray[j + 1][0];
-			tempArray[j][1] = (float)(resolution - t) / resolution * tempArray[j][1] + (float)t / resolution * tempArray[j + 1][1];
+			tempArray[j][0] = (float)(1 - t) * tempArray[j][0] + (float)t * tempArray[j + 1][0];
+			tempArray[j][1] = (float)(1 - t) * tempArray[j][1] + (float)t * tempArray[j + 1][1];
 		}
 
 	}
 	return vec2(tempArray[0][0], tempArray[0][1]);
 }
 
-void defaultModality(float tempArray[MaxNumPts][2], int NumPts, int resolution) {
-	for (int t = 0; t < resolution; t++) {
-		vec2 splinePoint = deCasteljau(tempArray, t, resolution);
-		CurveArray[t][0] = splinePoint[0];
-		CurveArray[t][1] = splinePoint[1];
-	}
-}
-
-std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> deCasteljauSubdivision(float Array[MaxNumPts][2], int t, int resolution) {
-
+std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> deCasteljauSubdivision(float Array[MaxNumPts][2], float t, int NumPts) {
 	std::vector<glm::vec2> firstSetCP(NumPts);
 	std::vector<glm::vec2> secondSetCP(NumPts);
 
@@ -226,8 +240,8 @@ std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> deCasteljauSubdivision
 
 	for (int i = 0; i < NumPts - 1; i++) {
 		for (int j = 0; j < NumPts - i - 1; j++) {
-			Array[j][0] = (float)(resolution - t) / resolution * Array[j][0] + (float)t / resolution * Array[j + 1][0];
-			Array[j][1] = (float)(resolution - t) / resolution * Array[j][1] + (float)t / resolution * Array[j + 1][1];
+			Array[j][0] = (float)(1 - t) * Array[j][0] + (float)t * Array[j + 1][0];
+			Array[j][1] = (float)(1 - t) * Array[j][1] + (float)t * Array[j + 1][1];
 		}
 		firstSetCP[i + 1] = vec2(Array[0][0], Array[0][1]);
 		secondSetCP[i + 1] = vec2(Array[NumPts - i - 2][0], Array[NumPts - i - 2][1]);
@@ -244,15 +258,23 @@ float distancePointLine(glm::vec2 P, glm::vec2 A, glm::vec2 B) {
 	return glm::length(dist_vec);
 }
 
+void defaultModality(float tempArray[MaxNumPts][2], int NumPts) {
+	for (int t = 0; t < resolution; t++) {
+		vec2 splinePoint = deCasteljau(tempArray, (float)t / resolution);
+		CurveArray[t][0] = splinePoint.x;
+		CurveArray[t][1] = splinePoint.y;
+	}
+}
+
 void suddivisioneAdattiva(float Array[MaxNumPts][2], int NumPts)
 {
 	// Estrai Control point esterni: 
-	glm::vec2 P1(	
-		Array[0][0], 
+	glm::vec2 P1(
+		Array[0][0],
 		Array[0][1]);
 
 	glm::vec2 P2(
-		Array[NumPts - 1][0], 
+		Array[NumPts - 1][0],
 		Array[NumPts - 1][1]);
 
 	// Test di Planarità sui Control Point Interni
@@ -266,27 +288,25 @@ void suddivisioneAdattiva(float Array[MaxNumPts][2], int NumPts)
 
 		if (distancePointLine(P, P1, P2) > tol_planarita) test_planarita = 0;
 	}
-	if (test_planarita == 1){
+	if (test_planarita == 1) {
 		//Disegna segmento tra control point estremi tempArray[0] , tempArray[NumPts-1]
-		CurveArray[2 * resolution][0] = P1.x;
-		CurveArray[2 * resolution][1] = P1.y;
-		CurveArray[2 * resolution + 1][0] = P2.x;
-		CurveArray[2 * resolution + 1][1] = P2.y;
+		CurveArray[2 * resolution][0] = P1.x;		CurveArray[2 * resolution][1] = P1.y;
+		CurveArray[2 * resolution + 1][0] = P2.x;	CurveArray[2 * resolution + 1][1] = P2.y;
 		resolution = resolution + 1;
 		return;
 	}
 	else {
 		// Applica deCasteljau nel parametro t=0.5 salvando i CP delle due nuove curve
-		std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> result = deCasteljauSubdivision(Array, 1, 2);
+		std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> result = deCasteljauSubdivision(Array, 0.5f, NumPts);
 		int a = 1;
 
-		float firstArray[MaxNumPts][2] = { {0} };
+		float firstArray[MaxNumPts][2] ;
 		for (int i = 0; i < NumPts; i++) {
-			firstArray[i][0] = (result.first)[i].x; 
+			firstArray[i][0] = (result.first)[i].x;
 			firstArray[i][1] = (result.first)[i].y;
 		}
 
-		float secondArray[MaxNumPts][2] = { {0} };
+		float secondArray[MaxNumPts][2] ;
 		for (int i = 0; i < NumPts; i++) {
 			secondArray[i][0] = (result.second)[i].x;
 			secondArray[i][1] = (result.second)[i].y;
@@ -298,7 +318,99 @@ void suddivisioneAdattiva(float Array[MaxNumPts][2], int NumPts)
 	return;
 }
 
+void catmullRom(float Array[MaxNumPts][2], int NumPts) {
+	//to get an efficient drawing I'll use the suddivisioneAdattiva Function to draw the splines :D
 
+	if (NumPts == 2) {
+		suddivisioneAdattiva(Array, NumPts);
+		return;
+	}
+	float Points[MaxNumPts][2] ;
+
+	//Case P[0] (spline with that interpolates points 0 & 1)
+	vec2 P0(Array[0][0], Array[0][1]);
+	vec2 P1(Array[1][0], Array[1][1]);
+	vec2 P0p = P0 + P1 / 3.0f;
+	vec2 P2(Array[2][0], Array[2][1]);
+	vec2 P1m = P1 - (P2 - P0) / 6.0f;
+
+	Points[0][0] = P0.x;	Points[0][1] = P0.y;
+	Points[1][0] = P0p.x;	Points[1][1] = P0p.y;
+	Points[2][0] = P1m.x;	Points[2][1] = P1m.y;
+	Points[3][0] = P1.x;	Points[3][1] = P1.y;
+	suddivisioneAdattiva(Points, 4);
+
+	//case P[NumPts] (spline with that interpolates point NumPts - 2 & NumPts - 1)
+	vec2 PNm2(Array[NumPts - 3][0], Array[NumPts - 3][1]);
+	vec2 PNm1(Array[NumPts - 2][0], Array[NumPts - 2][1]);
+	vec2 PN(Array[NumPts - 1][0], Array[NumPts - 1][1]);
+	vec2 PNm1p = PNm1 + (PN - PNm2) / 6.0f;
+	vec2 PNm = PN - (PN - PNm1) / 3.0f;
+
+	Points[0][0] = PNm1.x;	Points[0][1] = PNm1.y;
+	Points[1][0] = PNm1p.x;	Points[1][1] = PNm1p.y;
+	Points[2][0] = PNm.x;	Points[2][1] = PNm.y;
+	Points[3][0] = PN.x;	Points[3][1] = PN.y;
+	suddivisioneAdattiva(Points, 4);
+
+	//other cases
+	for (int i = 1; i < NumPts - 2; i++) {
+		vec2 Pim1(Array[i - 1][0], Array[i - 1][1]);
+		vec2 Pip1(Array[i + 1][0], Array[i + 1][1]);
+		vec2 Pip2(Array[i + 2][0], Array[i + 2][1]);
+		vec2 Pi(Array[i][0], Array[i][1]);
+		vec2 Pip = Pi + (Pip1 - Pim1) / 6.0f;
+		vec2 Pip1m = Pip1 - (Pip2 - Pi) / 6.0f;
+
+		Points[0][0] = Pi.x;	Points[0][1] = Pi.y;
+		Points[1][0] = Pip.x;	Points[1][1] = Pip.y;
+		Points[2][0] = Pip1m.x;	Points[2][1] = Pip1m.y;
+		Points[3][0] = Pip1.x;	Points[3][1] = Pip1.y;
+		suddivisioneAdattiva(Points, 4);
+	}
+}
+
+void continuity(float Array[MaxNumPts][2], int NumPts) {
+	float Points[MaxNumPts][2];
+
+	if (continuityType == C1) {
+		//have to modify points in index 4, 7, 10
+		for (int i = 1; i < NumPts / 2; i++) {
+			PointArray[1 + 3 * i][0] = 2 * PointArray[3 * i][0] - PointArray[3 * i - 1][0];
+			PointArray[1 + 3 * i][1] = 2 * PointArray[3 * i][1] - PointArray[3 * i - 1][1];
+		}
+	}
+
+	if (continuityType == G1) {
+		//have to modify points in index 4, 7, 10
+		for (int i = 1; i < NumPts / 2; i++) {
+			vec2 centralPoint = vec2(PointArray[3 * i][0], PointArray[3 * i][1]);
+			vec2 backPoint = vec2(PointArray[3 * i - 1][0], PointArray[3 * i - 1][1]);
+			vec2 Point = vec2(PointArray[3 * i + 1][0], PointArray[3 * i + 1][1]);
+			vec2 line = normalize(centralPoint - backPoint);
+			vec2 newPoint = centralPoint + line * dot(Point - centralPoint, line);
+			PointArray[1 + 3 * i][0] = newPoint.x;
+			PointArray[1 + 3 * i][1] = newPoint.y;
+		}
+	}
+
+	if (NumPts > 3) {
+		Points[0][0] = Array[0][0];	Points[0][1] = Array[0][1];
+		Points[1][0] = Array[1][0];	Points[1][1] = Array[1][1];
+		Points[2][0] = Array[2][0];	Points[2][1] = Array[2][1];
+		Points[3][0] = Array[3][0];	Points[3][1] = Array[3][1];
+		suddivisioneAdattiva(Points, 4);
+	}
+	
+	for (int i = 1; i < (NumPts - 1) / 3; i++) {
+		Points[0][0] = Array[3 * i][0];	Points[0][1] = Array[3 * i][1];
+		Points[1][0] = Array[3 * i + 1][0];	Points[1][1] = Array[3 * i + 1][1];
+		Points[2][0] = Array[3 * i + 2][0];	Points[2][1] = Array[3 * i + 2][1];
+		Points[3][0] = Array[3 * i + 3][0];	Points[3][1] = Array[3 * i + 3][1];
+		suddivisioneAdattiva(Points, 4);
+	}
+	
+}
 
 void init(void)
 {
@@ -318,7 +430,7 @@ void init(void)
 	glViewport(0, 0, 500, 500);
 }
 
-void drawData() {
+void drawArrayData() {
 	glBindVertexArray(VAO_2);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO_2);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(CurveArray), &CurveArray[0], GL_STATIC_DRAW);
@@ -366,35 +478,43 @@ void drawElementData() {
 void drawScene(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
-	float tempArray[MaxNumPts][2] = { {0} };
-	float firstArray[MaxNumPts][2] = { {0} };
+	float tempArray[MaxNumPts][2] ;
+	float firstArray[MaxNumPts][2] ;
 	if (NumPts > 1) {
+		std::copy(&PointArray[0][0], &PointArray[0][0] + MaxNumPts * 2, &tempArray[0][0]);
 		switch (behavior)
 		{
 		case DefaultMode:
-			resolution = 10;
-			std::copy(&PointArray[0][0], &PointArray[0][0] + MaxNumPts * 2, &tempArray[0][0]);
-			defaultModality(tempArray, NumPts, resolution);
-			drawData();
-			break;
-
-		case CatmullRom:
+			resolution = 50;
+			defaultModality(tempArray, NumPts);
+			drawArrayData();
 			break;
 
 		case Adattivo:
 			resolution = 0;
-			std::copy(&PointArray[0][0], &PointArray[0][0] + MaxNumPts * 2, &tempArray[0][0]);
 			suddivisioneAdattiva(tempArray, NumPts);
 			drawElementData();
 			break;
 
+		case CatmullRom:
+			resolution = 0;
+			catmullRom(tempArray, NumPts);
+			drawElementData();
+			break;
+
 		case Continuity:
+			resolution = 0;
+			continuity(tempArray, NumPts);
+			drawElementData();
+			glutPostRedisplay();
+
 			break;
 
 		default:
 			break;
 		}
 	}
+
 	// Draw control polygon
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
