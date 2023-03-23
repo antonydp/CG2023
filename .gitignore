@@ -404,3 +404,9 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Ignore editor-specific files
+*.config
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
