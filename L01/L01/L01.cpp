@@ -37,6 +37,7 @@ unsigned int VAO_3;
 unsigned int VBO_3;
 
 using namespace glm;
+using namespace std;
 
 #define MaxNumPts 300
 float PointArray[MaxNumPts][2];
@@ -81,42 +82,42 @@ void myKeyboardFunc(unsigned char key, int x, int y)
 	switch (key) {
 	case 'f':
 		removeFirstPoint();
-		glutPostRedisplay();
+		
 		break;
 	case 'l':
 		removeLastPoint();
-		glutPostRedisplay();
+		
 		break;
 	case 27:			// Escape key
 		exit(0);
 		break;
 	case 'n':
 		behavior = DefaultMode;
-		glutPostRedisplay();
+		
 		break;
 	case 'i':
 		behavior = CatmullRom;
-		glutPostRedisplay();
+		
 		break;
 	case 'a':
 		behavior = Adattivo;
-		glutPostRedisplay();
+		
 		break;
 	case 'c':
 		behavior = Continuity;
-		glutPostRedisplay();
+		
 		break;
 	case '0':
 		continuityType = C0;
-		glutPostRedisplay();
+		
 		break;
 	case '1':
 		continuityType = C1;
-		glutPostRedisplay();
+		
 		break;
 	case 'g':
 		continuityType = G1;
-		glutPostRedisplay();
+		
 		break;
 	}
 
@@ -142,15 +143,15 @@ void resizeWindow(int w, int h)
 }
 
 // this function check if a point is close to a drawn point.
-void NearestPoint(glm::vec2 point) {
+void NearestPoint(vec2 point) {
 	int nearestIndex = -1;
 	float nearestDistance = 3; // 3 is just a constant greater than 2*sqrt(2) (max distace b/w points)
 	for (int i = 0; i < NumPts; i++) {
-		glm::vec2 p(PointArray[i][0], PointArray[i][1]);
-		float distance = glm::distance(point, p);
-		if (distance < eps && distance < nearestDistance) {
+		vec2 p(PointArray[i][0], PointArray[i][1]);
+		float dist = distance(point, p);
+		if (dist < eps && dist < nearestDistance) {
 			nearestIndex = i;
-			nearestDistance = distance;
+			nearestDistance = dist;
 		}
 	}
 	//select the nearest point (-1 is no point is close enough)
@@ -168,7 +169,7 @@ void myMouseFunc(int button, int state, int x, int y) {
 		NearestPoint(vec2(xPos, yPos));
 		if (selectedPoint == -1) {
 			addNewPoint(xPos, yPos); //(floor(xPos*10)/10, floor(yPos*10)/10);
-			glutPostRedisplay();
+			
 		}
 	}
 	else if (button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
@@ -180,12 +181,10 @@ void myMouseFunc(int button, int state, int x, int y) {
 void motion(int x, int y) {
 	float xPos = -1.0f + ((float)x) * 2 / ((float)(width));
 	float yPos = -1.0f + ((float)(height - y)) * 2 / ((float)(height));
-
+	cout << xPos << ' ' << yPos << endl;
 	if (selectedPoint != -1) {
 		PointArray[selectedPoint][0] = xPos;
 		PointArray[selectedPoint][1] = yPos;
-		glutPostRedisplay();
-
 	}
 }
 // Add a new point to the end of the list.  
@@ -220,7 +219,7 @@ void initShader(void)
 }
 
 // DeCasteljau algoritm.
-glm::vec2 deCasteljau(float tempArray[MaxNumPts][2], float t) {
+vec2 deCasteljau(float tempArray[MaxNumPts][2], float t) {
 	for (int i = 0; i < NumPts - 1; i++) {
 		for (int j = 0; j < NumPts - i - 1; j++) {
 			tempArray[j][0] = (float)(1 - t) * tempArray[j][0] + (float)t * tempArray[j + 1][0];
@@ -231,9 +230,9 @@ glm::vec2 deCasteljau(float tempArray[MaxNumPts][2], float t) {
 	return vec2(tempArray[0][0], tempArray[0][1]);
 }
 
-std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> deCasteljauSubdivision(float Array[MaxNumPts][2], float t, int NumPts) {
-	std::vector<glm::vec2> firstSetCP(NumPts);
-	std::vector<glm::vec2> secondSetCP(NumPts);
+pair<vector<vec2>, vector<vec2>> deCasteljauSubdivision(float Array[MaxNumPts][2], float t, int NumPts) {
+	vector<vec2> firstSetCP(NumPts);
+	vector<vec2> secondSetCP(NumPts);
 
 	firstSetCP[0] = vec2(Array[0][0], Array[0][1]);
 	secondSetCP[0] = vec2(Array[NumPts - 1][0], Array[NumPts - 1][1]);
@@ -250,12 +249,12 @@ std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> deCasteljauSubdivision
 	return { firstSetCP, secondSetCP };
 }
 
-float distancePointLine(glm::vec2 P, glm::vec2 A, glm::vec2 B) {
-	glm::vec2 AB = B - A;
-	glm::vec2 AP = P - A;
-	glm::vec2 proj_AP_AB = glm::dot(AP, AB) / glm::dot(AB, AB) * AB;
-	glm::vec2 dist_vec = AP - proj_AP_AB;
-	return glm::length(dist_vec);
+float distancePointLine(vec2 P, vec2 A, vec2 B) {
+	vec2 AB = B - A;
+	vec2 AP = P - A;
+	vec2 proj_AP_AB = dot(AP, AB) / dot(AB, AB) * AB;
+	vec2 dist_vec = AP - proj_AP_AB;
+	return length(dist_vec);
 }
 
 void defaultModality(float tempArray[MaxNumPts][2], int NumPts) {
@@ -269,11 +268,11 @@ void defaultModality(float tempArray[MaxNumPts][2], int NumPts) {
 void suddivisioneAdattiva(float Array[MaxNumPts][2], int NumPts)
 {
 	// Estrai Control point esterni: 
-	glm::vec2 P1(
+	vec2 P1(
 		Array[0][0],
 		Array[0][1]);
 
-	glm::vec2 P2(
+	vec2 P2(
 		Array[NumPts - 1][0],
 		Array[NumPts - 1][1]);
 
@@ -282,7 +281,7 @@ void suddivisioneAdattiva(float Array[MaxNumPts][2], int NumPts)
 	for (int i = 1; i < NumPts - 1; i++)
 	{
 		// Calcolo distanza tempArray[i] dalla retta
-		glm::vec2 P(
+		vec2 P(
 			Array[i][0],
 			Array[i][1]);
 
@@ -297,7 +296,7 @@ void suddivisioneAdattiva(float Array[MaxNumPts][2], int NumPts)
 	}
 	else {
 		// Applica deCasteljau nel parametro t=0.5 salvando i CP delle due nuove curve
-		std::pair<std::vector<glm::vec2>, std::vector<glm::vec2>> result = deCasteljauSubdivision(Array, 0.5f, NumPts);
+		pair<vector<vec2>, vector<vec2>> result = deCasteljauSubdivision(Array, 0.5f, NumPts);
 		int a = 1;
 
 		float firstArray[MaxNumPts][2] ;
@@ -447,7 +446,7 @@ void drawArrayData() {
 }
 
 void drawElementData() {
-	std::vector<GLuint> indices(resolution * 2);
+	vector<GLuint> indices(resolution * 2);
 	// genera la lista degli indici
 	for (int i = 0; i < resolution * 2; i++) {
 		indices[i] = i;
@@ -481,7 +480,7 @@ void drawScene(void)
 	float tempArray[MaxNumPts][2] ;
 	float firstArray[MaxNumPts][2] ;
 	if (NumPts > 1) {
-		std::copy(&PointArray[0][0], &PointArray[0][0] + MaxNumPts * 2, &tempArray[0][0]);
+		copy(&PointArray[0][0], &PointArray[0][0] + MaxNumPts * 2, &tempArray[0][0]);
 		switch (behavior)
 		{
 		case DefaultMode:
@@ -506,7 +505,7 @@ void drawScene(void)
 			resolution = 0;
 			continuity(tempArray, NumPts);
 			drawElementData();
-			glutPostRedisplay();
+			
 
 			break;
 
@@ -529,7 +528,9 @@ void drawScene(void)
 	glDrawArrays(GL_LINE_STRIP, 0, NumPts);
 	glBindVertexArray(0);
 
+	glutPostRedisplay();
 	glutSwapBuffers();
+
 }
 
 int main(int argc, char** argv)
