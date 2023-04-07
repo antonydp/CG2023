@@ -27,7 +27,6 @@ GLuint ShaderMaker::createProgram(char* vertexfilename, char *fragmentfilename)
 	GLenum ErrorCheckValue = glGetError();
 	int success;
 	char infoLog[512];
-	smoothstep()
 
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 
