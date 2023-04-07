@@ -12,6 +12,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <vector>
 #include <functional>
+#include <map>
 
 using namespace glm;
 using namespace std;
@@ -50,6 +51,7 @@ typedef struct {
 Figura sfondo;
 Figura fioregrande;
 Figura fiorepiccolo;
+Figura stelo;
 
 //SCENA
 vector<Figura> Scena;
@@ -86,10 +88,12 @@ int resolution;
 float CurveArray[300][2];
 float PointArray[6][2];
 
-std::vector<std::function<vec3(float)>> pointfun; 
+
+std::vector<std::function<vec2(float)>> pointfun; 
 std::vector<std::function<vec4(float)>> colorfun;
+
 typedef struct {
-	vec3 position;
+	vec2 position;
 	vec4 color;
 } Center_info;
 
@@ -224,20 +228,19 @@ void catmullRom(float Array[6][2], int NumPts) {
 	}
 }
 
-
-void costruisci_curva_parametrica(Center_info center, std::vector<std::function<vec3(float)>> points, std::vector<std::function<vec4(float)>> colors, std::vector<int> numPoints, Figura* fig) {
+void costruisci_curva_parametrica(Center_info center, std::vector<std::function<vec2(float)>> points, std::vector<std::function<vec4(float)>> colors, std::vector<int> numPoints, Figura* fig) {
 
 	int i, j;
 	float stepA;
 	float t;
-	fig->vertici.push_back(center.position);
+	fig->vertici.push_back(vec3(center.position,0));
 	fig->colors.push_back(center.color);
 	for (j = 0; j < points.size(); j++) {
 		stepA = (2 * PI) / numPoints[j];
 		for (i = 0; i <= numPoints[j]; i++)
 		{
 			t = (float)i * stepA;
-			fig->vertici.push_back(points[j](t));
+			fig->vertici.push_back(vec3(points[j](t),0));
 			//Colore 
 			fig->colors.push_back(colors[j](t));
 		}
@@ -246,17 +249,25 @@ void costruisci_curva_parametrica(Center_info center, std::vector<std::function<
 	crea_VAO_Vector(fig);
 }
 
-void costruisci_spline_spessa(float Pointsarray[300][2], vec4 color, Figura* fig){
+void costruisci_spline_spessa(float Array[6][2], int numpts, vec4 color, float spessore, Figura* fig){
 	int i;
+	catmullRom(Array, numpts);
 
-	for (i = 0; i <= resolution * 2 - 2; i = i + 2)
+	for (i = 0; i < 2 * resolution; i = i+2)
 	{
-		fig->vertici.push_back(vec3(Pointsarray[i][0], Pointsarray[i][1], 0));
-		fig->vertici.push_back(vec3(Pointsarray[i + 1][0], Pointsarray[i + 1][1], 0));
-		fig->vertici.push_back(vec3(Pointsarray[i][0], Pointsarray[i][1] + 0.2, 0));
-		fig->vertici.push_back(vec3(Pointsarray[i][0], Pointsarray[i][1] + 0.2, 0));
-		fig->vertici.push_back(vec3(Pointsarray[i + 1][0], Pointsarray[i + 1][1], 0));
-		fig->vertici.push_back(vec3(Pointsarray[i + 1][0], Pointsarray[i + 1][1] + 0.2, 0));
+		vec3 point_i = vec3(CurveArray[i][0], CurveArray[i][1], 0);
+
+		vec3 point_ip = vec3(CurveArray[i + 1][0], CurveArray[i + 1][1], 0);
+		vec3 direction = point_i - point_ip;
+		vec3 orthogonal = cross(direction, vec3(0.0f, 0.0f, 1.0f));
+		orthogonal = orthogonal / length(orthogonal);
+
+		fig->vertici.push_back(point_i + spessore * orthogonal);
+		fig->vertici.push_back(point_ip + spessore * orthogonal);
+		fig->vertici.push_back(point_i - spessore * orthogonal);
+		fig->vertici.push_back(point_i - spessore * orthogonal);
+		fig->vertici.push_back(point_ip + spessore * orthogonal);
+		fig->vertici.push_back(point_ip - spessore * orthogonal);
 		//Colore 
 		fig->colors.push_back(color);
 		fig->colors.push_back(color);
@@ -264,7 +275,30 @@ void costruisci_spline_spessa(float Pointsarray[300][2], vec4 color, Figura* fig
 		fig->colors.push_back(color);
 		fig->colors.push_back(color);
 		fig->colors.push_back(color);
+
+		float stepA = (2 * PI) / 10;
+		float t;
+		int j;
+		for (j = 0; j < 10; j++) {
+			t = (float)j * stepA;
+			fig->vertici.push_back(point_i);
+			fig->vertici.push_back(point_i + spessore * vec3(cos(t), sin(t), 0));
+			fig->vertici.push_back(point_i + spessore * vec3(cos(t + stepA), sin(t + stepA), 0));
+			//Colore 
+			fig->colors.push_back(color);
+			fig->colors.push_back(color);
+			fig->colors.push_back(color);
+
+			fig->vertici.push_back(point_ip);
+			fig->vertici.push_back(point_ip + spessore * vec3(cos(t), sin(t), 0));
+			fig->vertici.push_back(point_ip + spessore * vec3(cos(t + stepA), sin(t + stepA), 0));
+			//Colore 
+			fig->colors.push_back(color);
+			fig->colors.push_back(color);
+			fig->colors.push_back(color);
+		}
 	}
+
 
 	fig->nv = fig->vertici.size();
 	crea_VAO_Vector(fig);
@@ -283,43 +317,36 @@ void init_shader(void)
 void init(void)
 {
 	// Define the center point of the box
-	Center_info center = { {0, 0, 0}, {.5, 0, .5, 1} };
-
-	// Define the size of the box
-	float size = 2.0f;
-
+	Center_info center = { {0, 0}, {0, .5, .5, 1} };
 	// Define the point and color functions for the sides of the box
 	pointfun = {
 		// Bottom
-		[size](float t) -> vec3 { return vec3((2*t/(2*PI)-1), -1, 0); },
+		[](float t) -> vec2 { return glm::mix(vec2(-1, -1), vec2(1, -1), t / (2 * PI)); },
 		// Top
-		[size](float t) -> vec3 { return vec3((2*t/(2*PI)-1), 1, 0); },
+		[](float t) -> vec2 { return glm::mix(vec2(-1, 1), vec2(1, 1), t / (2 * PI)); },
 		// Left
-		[size](float t) -> vec3 { return vec3(-1, (2*t/(2*PI)-1),  0); },
+		[](float t) -> vec2 { return glm::mix(vec2(-1, -1), vec2(-1, 1), t / (2 * PI)); },
 		// Right
-		[size](float t) -> vec3 { return vec3(1, (2*t/(2*PI)-1),  0); },
+		[](float t) -> vec2 { return glm::mix(vec2(1, -1), vec2(1, 1), t / (2 * PI)); },
 	};
-
 	colorfun = {
-		// Bottom (blue)
+		// Bottom (green)
+		[](float t) -> vec4 { return vec4(0, 1, 0, 1); },
+		// Top (blue)
 		[](float t) -> vec4 { return vec4(0, 0, 1, 1); },
-		// Top (red)
-		[](float t) -> vec4 { return vec4(1, 0, 0, 1); },
 		// Left 
-		[](float t) -> vec4 { return glm::mix(vec4(0, 0, 1, 1), vec4(1, 0, 0, 1), t / (2 * PI)); },
-		// Right glm::mix(red, blue, value / (2*PI));
-		[](float t) -> vec4 { return glm::mix(vec4(0, 0, 1, 1), vec4(1, 0, 0, 1), t / (2 * PI)); },
+		[](float t) -> vec4 { return glm::mix(vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), t / (2 * PI)); },
+		// Right 
+		[](float t) -> vec4 { return glm::mix(vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), t / (2 * PI)); },
 	};
-
-	costruisci_curva_parametrica(center, pointfun, colorfun, { 3,3,3,3 }, &sfondo);
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 2,2,2,2 }, &sfondo);
 	Scena.push_back(sfondo);
 
-	center = { {0, 0, 0}, {0, 1, 0, 1} };
-
-	pointfun = { [](float t) -> vec3 {
+	center = { {0, 0}, {0, 1, 0, 1} };
+	pointfun = { [](float t) -> vec2 {
 		float x = (2 + 10 * sin(10 * t)) * cos(t);
 		float y = (2 + 10 * sin(10 * t)) * sin(t);
-		return vec3(x, y, 0);
+		return vec2(x, y);
 	} 
 	};
 	colorfun = { [](float t) -> vec4 {
@@ -332,12 +359,11 @@ void init(void)
 	costruisci_curva_parametrica(center, pointfun , colorfun , {fioregrande.nTriangles}, &fioregrande);
 	Scena.push_back(fioregrande);
 
-	center = { {0, 0, 0}, {1, 1, 0, 1} };
-	
-	pointfun = { [](float t) -> vec3 {
+	center = { {0, 0}, {1, 1, 0, 1} };
+	pointfun = { [](float t) -> vec2 {
 		float x = (2 + 10 * sin(10 * t)) * cos(t);
 		float y = (2 + 10 * sin(10 * t)) * sin(t);
-		return vec3(x, y, 0);
+		return vec2(x, y);
 	} };
 	colorfun = { [](float t) -> vec4 {
 		float r = 1;
@@ -349,7 +375,13 @@ void init(void)
 	costruisci_curva_parametrica(center, pointfun, colorfun, {fiorepiccolo.nTriangles},&fiorepiccolo);
 	Scena.push_back(fiorepiccolo);
 
+	PointArray[0][0] = 0; PointArray[0][1] = -1;
+	PointArray[1][0] = 0.5f; PointArray[1][1] = -.6;
+	PointArray[2][0] = 0; PointArray[2][1] = 1;
 
+	
+	costruisci_spline_spessa(PointArray, 3, vec4(.58f, 0.3f, 0, 1), .1f, &stelo);
+	Scena.push_back(stelo);
 
 	MatProj = glGetUniformLocation(programId, "Projection");
 	MatModel = glGetUniformLocation(programId, "Model");
@@ -401,7 +433,7 @@ void drawScene(void)
 	float time = glutGet(GLUT_ELAPSED_TIME) / 1000.0f;
 	glUniform1f(loctime, time);
 
-	vec3 globaltranslate = vec3(500, 500, 0);
+	vec3 globaltranslate = vec3(500, 200, 0);
 	vec3 globalscalevec = vec3(1.1 , 1.1, 1);
 
 	Scena[0].Model = mat4(1.0);
@@ -427,6 +459,14 @@ void drawScene(void)
 	Scena[2].Model = scale(Scena[2].Model, vec3(.5, .5, 1.0));
 
 	drawfan(2);
+
+	Scena[3].Model = mat4(1.0);
+	Scena[3].Model = translate(Scena[3].Model, vec3(width / 2, height / 2, 0));
+	Scena[3].Model = scale(Scena[3].Model, vec3(width / 5, height / 5, 1.0));
+
+	drawtriangles(3);
+
+
 
 	glutSwapBuffers();
 }
