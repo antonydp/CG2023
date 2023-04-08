@@ -30,8 +30,27 @@ int width = 720;
 int height = 480;
 
 
-int frame_animazione = 0; // usato per animare la fluttuazione
+int frame_animazione = 0; // usato per animare
 float angoloRotazione = 0.0;
+float angoloRotazione2 = 0.0;
+
+
+//Acqua
+typedef struct {
+	float x, y, z; // position
+	float r, g, b, a; // color
+	float vx, vy; // velocity
+} WaterParticle;
+
+vector<WaterParticle> particles;
+const int NUM_PARTICLES = 100;
+const float GRAVITY = 0.01f;
+const float MAX_VELOCITY = 0.15f; 
+
+GLuint VAO_acqua;
+GLuint VBO_acqua_G;
+GLuint VBO_acqua_C;
+mat4 acquamatrix;
 
 //STRUTTURA FIGURA
 typedef struct {
@@ -52,9 +71,15 @@ Figura sfondo;
 Figura fioregrande;
 Figura fiorepiccolo;
 Figura stelo;
+Figura vaso;
+Figura vasotop;
+Figura innaffiatoio;
+Figura tuboinnaffiatoio;
 
 //SCENA
 vector<Figura> Scena;
+vec4 gray;
+vec4 lightgray;
 
 void crea_VAO_Vector(Figura* fig)
 {
@@ -78,6 +103,31 @@ void crea_VAO_Vector(Figura* fig)
 
 }
 
+void createVAO_Acqua() {
+	// Generate and bind the VAO
+	glGenVertexArrays(1, &VAO_acqua);
+	glBindVertexArray(VAO_acqua);
+	// Generate and bind the VBO
+	glGenBuffers(1, &VBO_acqua_G);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO_acqua_G);
+	// Copy the particle data to the VBO
+	glBufferData(GL_ARRAY_BUFFER, particles.size() * sizeof(WaterParticle), &particles[0], GL_STATIC_DRAW);
+	
+	// Configure the position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(WaterParticle), (void*)offsetof(WaterParticle, x));
+	glEnableVertexAttribArray(0);
+
+	glGenBuffers(1, &VBO_acqua_C);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO_acqua_C);
+	glBufferData(GL_ARRAY_BUFFER, particles.size() * sizeof(WaterParticle), &particles[0], GL_STATIC_DRAW);
+	// Configure the color attribute
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(WaterParticle), (void*)offsetof(WaterParticle, r));
+	glEnableVertexAttribArray(1);
+	// Unbind the VAO and VBO
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 //Tolleranza Planarietà
 float tol_planarita = 0.01f;
 
@@ -88,9 +138,8 @@ int resolution;
 float CurveArray[300][2];
 float PointArray[6][2];
 
-
-std::vector<std::function<vec2(float)>> pointfun; 
-std::vector<std::function<vec4(float)>> colorfun;
+vector<function<vec2(float)>> pointfun; 
+vector<function<vec4(float)>> colorfun;
 
 typedef struct {
 	vec2 position;
@@ -233,9 +282,9 @@ void costruisci_curva_parametrica(Center_info center, std::vector<std::function<
 	int i, j;
 	float stepA;
 	float t;
-	fig->vertici.push_back(vec3(center.position,0));
-	fig->colors.push_back(center.color);
 	for (j = 0; j < points.size(); j++) {
+		fig->vertici.push_back(vec3(center.position, 0));
+		fig->colors.push_back(center.color);
 		stepA = (2 * PI) / numPoints[j];
 		for (i = 0; i <= numPoints[j]; i++)
 		{
@@ -375,13 +424,132 @@ void init(void)
 	costruisci_curva_parametrica(center, pointfun, colorfun, {fiorepiccolo.nTriangles},&fiorepiccolo);
 	Scena.push_back(fiorepiccolo);
 
-	PointArray[0][0] = 0; PointArray[0][1] = -1;
-	PointArray[1][0] = 0.5f; PointArray[1][1] = -.6;
-	PointArray[2][0] = 0; PointArray[2][1] = 1;
+	PointArray[0][0] = 0.3f; PointArray[0][1] = 0.6f;
+	PointArray[1][0] = 0.5f; PointArray[1][1] = 0.8f;
+	PointArray[2][0] = 0.8f; PointArray[2][1] = 0.8f;
+	PointArray[3][0] = 0.75f; PointArray[3][1] = 0.1f;
+	PointArray[4][0] = 0.45f; PointArray[4][1] = -0.5f;
+	PointArray[5][0] = 0.3f; PointArray[5][1] = -1;
 
 	
-	costruisci_spline_spessa(PointArray, 3, vec4(.58f, 0.3f, 0, 1), .1f, &stelo);
+	costruisci_spline_spessa(PointArray, 6, vec4(.58f, 0.3f, 0, 1), .02f, &stelo);
 	Scena.push_back(stelo);
+
+	center = { {0, 0}, {0.27f, 0.23f, 0, 1} };
+	pointfun = {
+	[](float t) -> vec2 {
+		float x = t / (2 * PI) - 1.5f;
+		float y = -tan(t / (2 * PI)) + 0.6f;
+		return  vec2(x, y);
+	} ,
+	[](float t) -> vec2 {
+		float x = t / (2 * PI) - 0.5f;
+		float y = -1;
+		return vec2(x * 1.1f, y);
+	} ,
+	[](float t) -> vec2 {
+		float x = -t / (2 * PI) + 1.5f;
+		float y = tan(-t / (2 * PI)) + 0.6f;
+		return vec2(x, y);
+	} ,
+	[](float t) -> vec2 {
+		float x = 1.5f * sin((t - PI) / 2);
+		float y = 0.2f * cos((t - PI) / 2) + 0.6f;
+		return  vec2(x, y);
+	} };
+	colorfun = { [](float t) -> vec4 {
+		float r = 0.27f;
+		float g = 0.23f;
+		float b = 0.0f;
+		return vec4(r, g, b, 1.0f);
+	},
+		[](float t) -> vec4 {
+		float r = 0.27f;
+		float g = 0.23f;
+		float b = 0.0f;
+		return vec4(r, g, b, 1.0f);
+	} ,
+		[](float t) -> vec4 {
+		float r = 0.27f;
+		float g = 0.23f;
+		float b = 0.0f;
+		return vec4(r, g, b, 1.0f);
+	} ,
+		[](float t) -> vec4 {
+		float r = 0.27f;
+		float g = 0.23f;
+		float b = 0.0f;
+		return vec4(r, g, b, 1.0f);
+	} };
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 10,2,10,10 }, &vaso);
+	Scena.push_back(vaso);
+
+	center = { {0, 0.7f}, {.58f, 0.3f, 0, 1}  };
+	pointfun = {
+	[](float t) -> vec2 {
+		float x = 1.5f * sin(t);
+		float y = 0.2f * cos(t) + 0.6f;
+		return  vec2(x, y);
+	} };
+	colorfun = {
+		[](float t) -> vec4 {
+		float r = 0.47f;
+		float g = 0.23f;
+		float b = 0.0f;
+		return vec4(r, g, b, 1.0f);
+	} };
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 10 }, &vasotop);
+	Scena.push_back(vasotop);
+
+	gray = vec4(.7, .7, .7, 1);
+	lightgray = vec4(.2, .2, .2, 1);
+	center = { {0, 0}, mix(gray, lightgray, 0.5f) };
+	pointfun = {
+		// Bottom
+		[](float t) -> vec2 { return mix(vec2(-1, -1), vec2(1, -1), t / (2 * PI)); },
+		// Top
+		[](float t) -> vec2 { return mix(vec2(-0.8, 1), vec2(0.8, 1), t / (2 * PI)); },
+		// Left
+		[](float t) -> vec2 { return mix(vec2(-1, -1), vec2(-0.8, 1), t / (2 * PI)); },
+		// Right
+		[](float t) -> vec2 { return mix(vec2(1, -1), vec2(0.8, 1), t / (2 * PI)); },
+	};
+	colorfun = {
+		[](float t) -> vec4 {return mix(gray, lightgray, t / (2 * PI)); },
+		[](float t) -> vec4 {return mix(gray, lightgray, t / (2 * PI)); } ,
+		[](float t) -> vec4 {return gray; } ,
+		[](float t) -> vec4 {return lightgray; } };
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 10,2,10,10 }, & innaffiatoio);
+	Scena.push_back(innaffiatoio);
+
+
+	float lunghezzatubo = 1.0f;
+	gray = vec4(.7, .7, .7, 1);
+	lightgray = vec4(.2, .2, .2, 1);
+
+	vec2 attaccotubo0 = mix(vec2(1, -1), vec2(0.8, 1), 0.8f);
+	vec2 attaccotubo1 = mix(vec2(1, -1), vec2(0.8, 1), 0.9f);
+	vec2 tuboorto = cross(vec3(attaccotubo0 - attaccotubo1, 0), vec3(0, 0, 1));
+	tuboorto = tuboorto / length(tuboorto) * lunghezzatubo;
+	center = { {attaccotubo0.x, attaccotubo0.y}, mix(gray, lightgray, 0.5f) };
+
+	pointfun = {
+		// Bottom
+		[attaccotubo0, tuboorto](float t) -> vec2 { return mix(attaccotubo0, attaccotubo0 - tuboorto, t / (2 * PI)); },
+		// Top
+		[attaccotubo1, tuboorto](float t) -> vec2 { return mix(attaccotubo1, attaccotubo1 - tuboorto, t / (2 * PI)); },
+		// Left
+		[attaccotubo0, attaccotubo1](float t) -> vec2 { return mix(attaccotubo0, attaccotubo1, t / (2 * PI)); },
+		// Right
+		[attaccotubo0, attaccotubo1, tuboorto](float t) -> vec2 { return mix(attaccotubo0 - tuboorto, attaccotubo1 - tuboorto, t / (2 * PI)); },
+	};
+	colorfun = {
+		[](float t) -> vec4 {return lightgray; },
+		[](float t) -> vec4 {return gray; } ,
+		[](float t) -> vec4 {return mix(lightgray, gray, t / (2 * PI)); },
+		[](float t) -> vec4 {return mix(lightgray, gray, t / (2 * PI)); } };
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 10,2,10,10 }, &tuboinnaffiatoio);
+	Scena.push_back(tuboinnaffiatoio);
 
 	MatProj = glGetUniformLocation(programId, "Projection");
 	MatModel = glGetUniformLocation(programId, "Model");
@@ -389,7 +557,22 @@ void init(void)
 
 }
 
-double  degtorad(double angle) {
+void initParticles() {
+	particles.resize(NUM_PARTICLES);
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		particles[i].x = 0;
+		particles[i].y = 0;
+		particles[i].z = 0.0f;
+		particles[i].r = 0.0f;
+		particles[i].g = 0.0f;
+		particles[i].b = 1.0f;							//trucco per evitare che partano tutte insieme 
+		particles[i].a = 0.0f;							//partono invisibili
+		particles[i].vy = ((float)rand() / RAND_MAX) ;	//sparate verso l'alto a velocità variabili
+		particles[i].vx = 0;							// cosi che vengano resettate a poco a poco sull'estremità dell'annaffiatoio 
+	}
+}
+
+double degtorad(double angle) {
 	return angle * PI / 180;
 } 
 
@@ -402,10 +585,67 @@ void update_animation(int value)
 
 	}
 	angoloRotazione = cos(degtorad(frame_animazione)) * 0.1;
+	angoloRotazione2 = cos(degtorad(frame_animazione) - PI/3) * 0.1;
 
 	glutTimerFunc(25, update_animation, 0);
 	glutPostRedisplay();
 
+}
+void drawParticles() {
+	glBindBuffer(GL_ARRAY_BUFFER, VBO_acqua_G);
+	// Copy the particle data to the VBO
+	glBufferData(GL_ARRAY_BUFFER, particles.size() * sizeof(WaterParticle), &particles[0], GL_STATIC_DRAW);
+
+	// Configure the position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(WaterParticle), (void*)offsetof(WaterParticle, x));
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO_acqua_C);
+	// Copy the particle data to the VBO
+	glBufferData(GL_ARRAY_BUFFER, particles.size() * sizeof(WaterParticle), &particles[0], GL_STATIC_DRAW);
+
+	// Configure the position attribute
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(WaterParticle), (void*)offsetof(WaterParticle, r));
+	glEnableVertexAttribArray(0);
+
+	// Draw the particles
+	glUniformMatrix4fv(MatProj, 1, GL_FALSE, value_ptr(Projection));
+	glUniformMatrix4fv(MatModel, 1, GL_FALSE, value_ptr(acquamatrix));
+	glBindVertexArray(VAO_acqua);
+	glPointSize(4);
+	glDrawArrays(GL_POINTS, 0, particles.size());
+	glBindVertexArray(0);
+}
+
+void updateParticles(int value) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		WaterParticle& p = particles[i];
+		p.vy -= GRAVITY;
+		mat3 vel_rotation_matrix = rotate(mat4(1.0), 5 * abs(angoloRotazione), vec3(0, 0, 1));
+		mat3 pos_rotation_matrix = rotate(mat4(1.0), -5 * abs(angoloRotazione), vec3(0, 0, 1));
+		vec2 rotated_vel = vel_rotation_matrix * vec3(p.vx, p.vy, 0);
+		vec2 rotated_pos = pos_rotation_matrix * vec3(p.x, p.y, 0);
+		p.x += rotated_vel.x; //p.x += p.vx;
+		p.y += rotated_vel.y; //p.y += p.vy;
+		if (rotated_pos.y < -1.6f) {
+			// Particle is out of bounds, reset it
+			p.x = 1.8f;
+			p.y = 0.8f;
+			p.vx = 13 * abs(angoloRotazione) * abs(((float)rand() / RAND_MAX) * MAX_VELOCITY - MAX_VELOCITY / 2.0f);
+			p.vy = 3 * abs(angoloRotazione) * ((float)rand() / RAND_MAX) * MAX_VELOCITY;
+
+			if (abs(angoloRotazione) < .05f) {
+				p.a = 0;
+			}
+			else {
+				p.a = 1;
+			}
+		}
+		
+	}
+	glutTimerFunc(25, updateParticles, 0);
+
+	glutPostRedisplay();
 }
 
 void drawfan(int i) {
@@ -425,7 +665,6 @@ void drawtriangles(int i) {
 	glBindVertexArray(0);
 }
 
-
 void drawScene(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -433,40 +672,87 @@ void drawScene(void)
 	float time = glutGet(GLUT_ELAPSED_TIME) / 1000.0f;
 	glUniform1f(loctime, time);
 
-	vec3 globaltranslate = vec3(500, 200, 0);
-	vec3 globalscalevec = vec3(1.1 , 1.1, 1);
+	vec3 globaltranslate = vec3(500, 50, 0);
 
-	Scena[0].Model = mat4(1.0);
-
-	Scena[0].Model = translate(Scena[0].Model, vec3(width / 2, height / 2, 0));
-	Scena[0].Model = scale(Scena[0].Model, vec3(width/2, height/2, 1.0));
-
-	drawfan(0);
-
-	Scena[1].Model = mat4(1.0);
-	Scena[1].Model = translate(Scena[1].Model, globaltranslate);
-	Scena[1].Model = scale(Scena[1].Model, globalscalevec);
-	Scena[1].Model = scale(Scena[1].Model, vec3(10, 10, 1.0));
-	Scena[1].Model = translate(Scena[1].Model, vec3(2, 0, 0));
-
-	drawfan(1);
-
-	Scena[2].Model = mat4(1.0);
-	Scena[2].Model = translate(Scena[2].Model, globaltranslate);
-	Scena[2].Model = scale(Scena[2].Model, globalscalevec);
-	Scena[2].Model = scale(Scena[2].Model, vec3(10, 10, 1.0));
-	Scena[2].Model = translate(Scena[2].Model, vec3(2, 0, 0));
-	Scena[2].Model = scale(Scena[2].Model, vec3(.5, .5, 1.0));
-
-	drawfan(2);
-
-	Scena[3].Model = mat4(1.0);
-	Scena[3].Model = translate(Scena[3].Model, vec3(width / 2, height / 2, 0));
-	Scena[3].Model = scale(Scena[3].Model, vec3(width / 5, height / 5, 1.0));
-
-	drawtriangles(3);
+	vec3 globalscalevec = 0.5f * vec3(1.2f + abs(angoloRotazione2 * 2), 1.2f + abs(angoloRotazione2 * 3), 1);
 
 
+	int index;
+
+
+	index = 0; //sfondo
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, vec3(width / 2, height / 2, 0));
+	Scena[index].Model = scale(Scena[index].Model, vec3(width/2, height/2, 1.0));
+
+	drawfan(index);
+
+
+	index = 4; //vaso
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, vec3(width / 7 * 5, height / 9, 0));
+	Scena[index].Model = scale(Scena[index].Model, vec3(100, 100, 1.0));
+
+	drawfan(index);
+
+	index = 5; //vasotop
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, vec3(width / 7 * 5, height / 9, 0));
+	Scena[index].Model = scale(Scena[index].Model, vec3(90, 90, 1.0));
+
+	drawfan(index);
+
+	index = 3; //stelo
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, vec3(0, 70, 0));
+	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
+	Scena[index].Model = scale(Scena[index].Model, globalscalevec);
+	Scena[index].Model = scale(Scena[index].Model, vec3(90, 130, 1.0));
+	Scena[index].Model = translate(Scena[index].Model, vec3(-.3f, 1, 0));
+
+	drawtriangles(index);
+	index = 1; //fiore fuori
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
+	Scena[index].Model = scale(Scena[index].Model, globalscalevec);
+	Scena[index].Model = scale(Scena[index].Model, vec3(10, 10, 1.0));
+	Scena[index].Model = translate(Scena[index].Model, vec3(0, 32, 0));
+
+	drawfan(index);
+
+	index = 2; //fiore dentro
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
+	Scena[index].Model = scale(Scena[index].Model, globalscalevec);
+	Scena[index].Model = scale(Scena[index].Model, vec3(10, 10, 1.0));
+	Scena[index].Model = translate(Scena[index].Model, vec3(0, 32, 0));
+	Scena[index].Model = scale(Scena[index].Model, vec3(.5, .5, 1.0));
+
+	drawfan(index);
+
+
+	index = 6;//innaffiatoio
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, vec3(width / 3, height / 2, 0));
+	Scena[index].Model = rotate(Scena[index].Model, -5 * abs(angoloRotazione), vec3(0, 0, 1));
+	Scena[index].Model = scale(Scena[index].Model, vec3(80, 80, 1.0));
+
+	drawfan(index);
+
+	index = 7;//tuboinnaffiatoio
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, vec3(width / 3, height / 2, 0));
+	Scena[index].Model = rotate(Scena[index].Model, -5 * abs(angoloRotazione), vec3(0, 0, 1));
+	Scena[index].Model = scale(Scena[index].Model, vec3(80, 80, 1.0));
+
+	drawfan(index);
+	acquamatrix = mat4(1.0);
+	acquamatrix = translate(acquamatrix, vec3(width / 3, height / 2, 0));
+	acquamatrix = rotate(acquamatrix, -5 * abs(angoloRotazione), vec3(0, 0, 1));
+	acquamatrix= scale(acquamatrix, vec3(80, 80, 1.0));
+
+	// Draw the particles
+	drawParticles();
 
 	glutSwapBuffers();
 }
@@ -482,6 +768,7 @@ void keyboardReleasedEvent(unsigned char key, int x, int y)
 	}
 	glutPostRedisplay();
 }
+
 void myKeyboard(unsigned char key, int x, int y)
 {
 	{
@@ -510,6 +797,7 @@ void reshape(int w, int h)
 		glViewport(0, 0, h * AspectRatio_mondo, h); 
 	}
 }
+
 int main(int argc, char* argv[])
 {
 	glutInit(&argc, argv);
@@ -518,7 +806,7 @@ int main(int argc, char* argv[])
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowSize(width, height);
 	glutInitWindowPosition(100, 100);
-	glutCreateWindow("Shooting in the sea");
+	glutCreateWindow("Mantieni il fiore in vita");
 
 	glutDisplayFunc(drawScene);
 	glutKeyboardFunc(myKeyboard);
@@ -528,10 +816,13 @@ int main(int argc, char* argv[])
 	
 	
 	glutTimerFunc(25, update_animation, 0);
+	glutTimerFunc(25, updateParticles, 0);
 
 	glewExperimental = GL_TRUE;
 	glewInit();
 	init_shader();
+	initParticles();
+	createVAO_Acqua();
 	init();
 
 	//Gestione della Trasparenza
@@ -539,3 +830,19 @@ int main(int argc, char* argv[])
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glutMainLoop();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
