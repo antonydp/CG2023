@@ -31,8 +31,10 @@ int height = 480;
 
 
 int frame_animazione = 0; // usato per animare
+bool spacePressed = false;
 float angoloRotazione = 0.0;
-float angoloRotazione2 = 0.0;
+
+float scalafiore = 0.6f;
 
 
 //Acqua
@@ -75,6 +77,8 @@ Figura vaso;
 Figura vasotop;
 Figura innaffiatoio;
 Figura tuboinnaffiatoio;
+Figura pallino;
+Figura corolla;
 
 //SCENA
 vector<Figura> Scena;
@@ -277,7 +281,7 @@ void catmullRom(float Array[6][2], int NumPts) {
 	}
 }
 
-void costruisci_curva_parametrica(Center_info center, std::vector<std::function<vec2(float)>> points, std::vector<std::function<vec4(float)>> colors, std::vector<int> numPoints, Figura* fig) {
+void costruisci_curva_parametrica(Center_info center, vector<function<vec2(float)>> points, vector<function<vec4(float)>> colors, vector<int> numPoints, Figura* fig) {
 
 	int i, j;
 	float stepA;
@@ -366,7 +370,7 @@ void init_shader(void)
 void init(void)
 {
 	// Define the center point of the box
-	Center_info center = { {0, 0}, {0, .5, .5, 1} };
+	Center_info center = { {0, 0}, {1, 1, 1, 1} };
 	// Define the point and color functions for the sides of the box
 	pointfun = {
 		// Bottom
@@ -380,15 +384,19 @@ void init(void)
 	};
 	colorfun = {
 		// Bottom (green)
-		[](float t) -> vec4 { return vec4(0, 1, 0, 1); },
+		[](float t) -> vec4 { return vec4(1, 1, 1, 1); },
+		[](float t) -> vec4 { return vec4(1, 1, 1, 1); },
+		[](float t) -> vec4 { return vec4(1, 1, 1, 1); },
+		[](float t) -> vec4 { return vec4(1, 1, 1, 1); },
+		//[](float t) -> vec4 { return vec4(0, 1, 0, 1); },
 		// Top (blue)
-		[](float t) -> vec4 { return vec4(0, 0, 1, 1); },
+		//[](float t) -> vec4 { return vec4(0, 0, 1, 1); },
 		// Left 
-		[](float t) -> vec4 { return glm::mix(vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), t / (2 * PI)); },
+		//[](float t) -> vec4 { return glm::mix(vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), t / (2 * PI)); },
 		// Right 
-		[](float t) -> vec4 { return glm::mix(vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), t / (2 * PI)); },
+		//[](float t) -> vec4 { return glm::mix(vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), t / (2 * PI)); },
 	};
-	costruisci_curva_parametrica(center, pointfun, colorfun, { 2,2,2,2 }, &sfondo);
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 2,2,10,10 }, &sfondo);
 	Scena.push_back(sfondo);
 
 	center = { {0, 0}, {0, 1, 0, 1} };
@@ -404,7 +412,7 @@ void init(void)
 		float b = 0;
 		return vec4(r, g, b, 1.0f);
 	} };
-	fioregrande.nTriangles = 130;
+	fioregrande.nTriangles = 200;
 	costruisci_curva_parametrica(center, pointfun , colorfun , {fioregrande.nTriangles}, &fioregrande);
 	Scena.push_back(fioregrande);
 
@@ -420,7 +428,7 @@ void init(void)
 		float b = 0.0f;
 		return vec4(r, g, b, 1.0f);
 	} };
-	fiorepiccolo.nTriangles = 130;
+	fiorepiccolo.nTriangles = 200;
 	costruisci_curva_parametrica(center, pointfun, colorfun, {fiorepiccolo.nTriangles},&fiorepiccolo);
 	Scena.push_back(fiorepiccolo);
 
@@ -551,6 +559,28 @@ void init(void)
 	costruisci_curva_parametrica(center, pointfun, colorfun, { 10,2,10,10 }, &tuboinnaffiatoio);
 	Scena.push_back(tuboinnaffiatoio);
 
+
+	center = { {0, 0}, {1,0.6,0,0} };
+	pointfun = {
+		// pallino
+		[](float t) -> vec2 { return vec2(cos(t), sin(t)); },
+	};
+	colorfun = {
+		[](float t) -> vec4 {return vec4(1,.6,0,1); }
+	};
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 10 }, &pallino);
+	Scena.push_back(pallino);
+
+	center = { {0, 0}, {1,1,0,1} };
+	pointfun = {
+		[](float t) -> vec2 { return vec2(cos(t), sin(t)); },
+	};
+	colorfun = {
+		[](float t) -> vec4 {return vec4(1,.7f,0,1); }
+	};
+	costruisci_curva_parametrica(center, pointfun, colorfun, { 10 }, &corolla);
+	Scena.push_back(corolla);
+
 	MatProj = glGetUniformLocation(programId, "Projection");
 	MatModel = glGetUniformLocation(programId, "Model");
 	loctime = glGetUniformLocation(programId, "time");
@@ -578,19 +608,47 @@ double degtorad(double angle) {
 
 void update_animation(int value)
 {
-	//Aggiorno l'angolo di fluttuazione del cannone
-	frame_animazione += 1;
-	if (frame_animazione >= 360) {
-		frame_animazione -= 360;
 
+	// If the space key is pressed, increase the value of angoloRotazione by its maximum value
+	//if (!space_key_pressed) {
+	//	frame_animazione += 1;
+	//} 
+	//angoloRotazione = cos(degtorad(frame_animazione)) * 0.1;
+	//angoloRotazione2 = cos(degtorad(frame_animazione) - PI/3) * 0.1;
+
+	float targetAngle = 0.0f; // target angle, initially set to 0
+	float targetScale = 0.5f; // target angle, initially set to 0
+
+	// Calculate the new target angle based on whether space is pressed or not
+	if (spacePressed) {
+		targetAngle = 0.1f;
+		if (angoloRotazione > 0.07f) {
+			targetScale = 0.9f;
+		}
 	}
-	angoloRotazione = cos(degtorad(frame_animazione)) * 0.1;
-	angoloRotazione2 = cos(degtorad(frame_animazione) - PI/3) * 0.1;
+	else {
+		targetAngle = 0.0f;		
+		if (angoloRotazione > 0.03f) {
+			targetScale = 0.9f;
+		}
+	}
+	float angleDiff = targetAngle - angoloRotazione;
+	float scaleDiff = targetScale - scalafiore;
 
+
+	float rotationAmount = angleDiff * 0.02f; 
+	float scaleAmount = scaleDiff * 0.002f; 
+
+	angoloRotazione += rotationAmount;
+	scalafiore += scaleAmount;
+
+	
 	glutTimerFunc(25, update_animation, 0);
 	glutPostRedisplay();
 
+
 }
+
 void drawParticles() {
 	glBindBuffer(GL_ARRAY_BUFFER, VBO_acqua_G);
 	// Copy the particle data to the VBO
@@ -674,11 +732,12 @@ void drawScene(void)
 
 	vec3 globaltranslate = vec3(500, 50, 0);
 
-	vec3 globalscalevec = 0.5f * vec3(1.2f + abs(angoloRotazione2 * 2), 1.2f + abs(angoloRotazione2 * 3), 1);
-
+	vec3 scalaFiore = vec3(scalafiore, scalafiore, 0);
 
 	int index;
 
+	
+	
 
 	index = 0; //sfondo
 	Scena[index].Model = mat4(1.0);
@@ -687,7 +746,16 @@ void drawScene(void)
 
 	drawfan(index);
 
+	index = 8;
+	for (int row = 0; row < 11; row++) {
+		for (int col = 0; col < 9; col++) {
+			Scena[index].Model = mat4(1.0);
+			Scena[index].Model = translate(Scena[index].Model, vec3(row * width / 9, col * height / 8, 0));
+			Scena[index].Model = scale(Scena[index].Model, vec3(width / 20, height / 20, 1.0));
 
+			drawfan(index);
+		}
+	}
 	index = 4; //vaso
 	Scena[index].Model = mat4(1.0);
 	Scena[index].Model = translate(Scena[index].Model, vec3(width / 7 * 5, height / 9, 0));
@@ -706,7 +774,7 @@ void drawScene(void)
 	Scena[index].Model = mat4(1.0);
 	Scena[index].Model = translate(Scena[index].Model, vec3(0, 70, 0));
 	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
-	Scena[index].Model = scale(Scena[index].Model, globalscalevec);
+	Scena[index].Model = scale(Scena[index].Model, scalaFiore);
 	Scena[index].Model = scale(Scena[index].Model, vec3(90, 130, 1.0));
 	Scena[index].Model = translate(Scena[index].Model, vec3(-.3f, 1, 0));
 
@@ -714,7 +782,7 @@ void drawScene(void)
 	index = 1; //fiore fuori
 	Scena[index].Model = mat4(1.0);
 	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
-	Scena[index].Model = scale(Scena[index].Model, globalscalevec);
+	Scena[index].Model = scale(Scena[index].Model, scalaFiore);
 	Scena[index].Model = scale(Scena[index].Model, vec3(10, 10, 1.0));
 	Scena[index].Model = translate(Scena[index].Model, vec3(0, 32, 0));
 
@@ -723,13 +791,22 @@ void drawScene(void)
 	index = 2; //fiore dentro
 	Scena[index].Model = mat4(1.0);
 	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
-	Scena[index].Model = scale(Scena[index].Model, globalscalevec);
+	Scena[index].Model = scale(Scena[index].Model, scalaFiore);
 	Scena[index].Model = scale(Scena[index].Model, vec3(10, 10, 1.0));
 	Scena[index].Model = translate(Scena[index].Model, vec3(0, 32, 0));
 	Scena[index].Model = scale(Scena[index].Model, vec3(.5, .5, 1.0));
 
 	drawfan(index);
 
+	index = 9; //corolla
+	Scena[index].Model = mat4(1.0);
+	Scena[index].Model = translate(Scena[index].Model, globaltranslate);
+	Scena[index].Model = scale(Scena[index].Model, scalaFiore);
+	Scena[index].Model = scale(Scena[index].Model, vec3(10, 10, 1.0));
+	Scena[index].Model = translate(Scena[index].Model, vec3(0, 32, 0));
+	Scena[index].Model = scale(Scena[index].Model, vec3(1.5, 1.5, 1.0));
+
+	drawfan(index);
 
 	index = 6;//innaffiatoio
 	Scena[index].Model = mat4(1.0);
@@ -762,6 +839,9 @@ void keyboardReleasedEvent(unsigned char key, int x, int y)
 	{
 		switch (key)
 		{
+		case ' ':
+			spacePressed = false;
+			break;
 		default:
 			break;
 		}
@@ -774,6 +854,9 @@ void myKeyboard(unsigned char key, int x, int y)
 	{
 		switch (key)
 		{
+		case ' ':
+			spacePressed = true;
+			break;
 		default:
 			break;
 		}
@@ -811,9 +894,7 @@ int main(int argc, char* argv[])
 	glutDisplayFunc(drawScene);
 	glutKeyboardFunc(myKeyboard);
 	glutReshapeFunc(reshape);
-	glutKeyboardUpFunc(keyboardReleasedEvent);
-	//glutTimerFunc(25, update_f, 0);
-	
+	glutKeyboardUpFunc(keyboardReleasedEvent);	
 	
 	glutTimerFunc(25, update_animation, 0);
 	glutTimerFunc(25, updateParticles, 0);
