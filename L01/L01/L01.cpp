@@ -279,7 +279,7 @@ void suddivisioneAdattiva(float Array[][2], int NumPts)
 		//Disegna segmento tra control point estremi tempArray[0] , tempArray[NumPts-1]
 		CurveArray[resolution][0] = P1.x;		CurveArray[resolution][1] = P1.y;
 		CurveArray[resolution + 1][0] = P2.x;	CurveArray[resolution + 1][1] = P2.y;
-		resolution = resolution + 2;
+		resolution = resolution + 1; //sovrascrive punti uguali
 		return;
 	}
 	else {
@@ -441,18 +441,21 @@ void drawScene(void)
 		case Adattivo:
 			resolution = 0;
 			suddivisioneAdattiva(tempArray, NumPts);
+			resolution++; //ultima linea
 			drawArrayData();
 			break;
 
 		case CatmullRom:
 			resolution = 0;
 			catmullRom(tempArray, NumPts);
+			resolution++; //ultima linea
 			drawArrayData();
 			break;
 
 		case Continuity:
 			resolution = 0;
 			continuity(tempArray, NumPts);
+			resolution++; //ultima linea
 			drawArrayData();
 			break;
 
