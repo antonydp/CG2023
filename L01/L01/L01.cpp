@@ -214,23 +214,15 @@ void initShader(void)
 }
 
 // DeCasteljau algoritm.
-vec2 deCasteljau(float tempArray[][2], float t) {
-	for (int i = 0; i < NumPts - 1; i++) {
-		for (int j = 0; j < NumPts - i - 1; j++) {
-			tempArray[j][0] = (float)(1 - t) * tempArray[j][0] + (float)t * tempArray[j + 1][0];
-			tempArray[j][1] = (float)(1 - t) * tempArray[j][1] + (float)t * tempArray[j + 1][1];
-		}
-
-	}
-	return vec2(tempArray[0][0], tempArray[0][1]);
-}
 
 vec2 deCasteljau(float Array[][2], float t, int NumPts, float fArray[][2] = nullptr, float sArray[][2] = nullptr) {
-	fArray[0][0] = Array[0][0]; fArray[0][1] = Array[0][1];
-	sArray[NumPts - 1][0] = Array[NumPts - 1][0]; sArray[NumPts - 1][1] = Array[NumPts - 1][1];
+	if (fArray != nullptr) {
+		fArray[0][0] = Array[0][0]; fArray[0][1] = Array[0][1];
+		sArray[NumPts - 1][0] = Array[NumPts - 1][0]; sArray[NumPts - 1][1] = Array[NumPts - 1][1];
+	}
 	if (NumPts > 1) {
-        for (int i = 0; i < NumPts; i++) {
-            for (int j = 0; j < NumPts - i; j++) {
+        for (int i = 0; i < NumPts - 1; i++) {
+            for (int j = 0; j < NumPts - i - 1; j++) {
                 Array[j][0] = (float)(1 - t) * Array[j][0] + (float)t * Array[j + 1][0];
                 Array[j][1] = (float)(1 - t) * Array[j][1] + (float)t * Array[j + 1][1];
             }
@@ -255,7 +247,7 @@ float distancePointLine(vec2 P, vec2 A, vec2 B) {
 
 void defaultModality(float tempArray[][2], int NumPts) {
 	for (int t = 0; t < resolution; t++) {
-		vec2 splinePoint = deCasteljau(tempArray, (float)t / resolution);
+		vec2 splinePoint = deCasteljau(tempArray, (float)t / resolution, NumPts);
 		CurveArray[t][0] = splinePoint.x;
 		CurveArray[t][1] = splinePoint.y;
 	}
