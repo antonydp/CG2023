@@ -1,4 +1,4 @@
-// Fragment shader: : Passthrough shading
+// Fragment shader: : Toon shading
 // ================
 #version 330
 

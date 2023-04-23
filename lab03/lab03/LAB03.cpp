@@ -913,7 +913,7 @@ void modifyModelMatrix(glm::vec3 translation_vector, glm::vec3 rotation_vector, 
 		objects[selected_obj].M = rotation_matrix * objects[selected_obj].M;
 	}
 	else objects[selected_obj].M = glm::rotate(objects[selected_obj].M, angle, rotation_vector);
-	objects[selected_obj].M[3] = glm::vec4(glm::vec3(objects[selected_obj].M[3]) + translation_vector,1);	
+	objects[selected_obj].M[3] = glm::vec4(glm::vec3(objects[selected_obj].M[3]) + translation_vector, 1);	
 }
 
 void generate_and_load_buffers(bool generate, Mesh* mesh)

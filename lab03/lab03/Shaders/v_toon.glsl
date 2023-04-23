@@ -1,4 +1,4 @@
-// Vertex shader: Pass-through shading
+// Vertex shader: Toon shading
 // ================
 #version 330
 
